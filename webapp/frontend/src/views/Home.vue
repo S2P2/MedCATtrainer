@@ -14,9 +14,6 @@
                @row-selected="select">
         <template #head(metrics)="data">
           <div id="metrics-head">Metrics</div>
-          <button class="btn btn-outline-primary load-metrics" @click="loadMetrics" v-if="selectedProjects.length > 0">
-            <font-awesome-icon icon="chevron-right"></font-awesome-icon>
-          </button>
           <b-tooltip target="metrics-head"
                      triggers="hover"
                      container="projectTable"
@@ -46,8 +43,8 @@
           </b-tooltip>
         </template>
         <template #head(anno_class)="">
-          <div id="dataset-header">Annotation Dataset</div>
-          <b-tooltip target="dataset-header"
+          <div id="anno-class-header">Annotation Dataset</div>
+          <b-tooltip target="anno-class-header"
                      triggers="hover"
                      container="projectTable">
             Annotation set classification.
@@ -57,6 +54,15 @@
             <div>
               <font-awesome-icon class="status-cell success" icon="globe"></font-awesome-icon> indicates global annotations are collected suitable for use within a global model.
             </div>
+          </b-tooltip>
+        </template>
+
+        <template #head(progress)="">
+          <div id="progress-header">Progress</div>
+          <b-tooltip target="progress-header"
+                     triggers="hover"
+                     container="projectTable">
+            Number of validated documents / total number of documents configured in the project
           </b-tooltip>
         </template>
         <template #cell(locked)="data">
@@ -115,6 +121,9 @@
         <template #cell(save_model)="data">
           <button class="btn btn-outline-primary" :disabled="saving" @click="saveModel(data.item.id)"><font-awesome-icon icon="save"></font-awesome-icon></button>
         </template>
+        <template #cell(progress)="data">
+          <div v-html="data.value"></div>
+        </template>
       </b-table>
     </div>
     <div>
@@ -124,6 +133,17 @@
       <transition name="alert"><div class="alert alert-primary" v-if="loadingModel" role="alert">Loading model</div></transition>
       <transition name="alert"><div class="alert alert-danger" v-if="modelCacheLoadError" role="alert">Error loading MedCAT model for project</div></transition>
       <transition name="alert"><div class="alert alert-danger" v-if="projectLockedWarning" role="alert">Unable load a locked project. Contact your CogStack administrator to unlock</div></transition>
+      <transition name="alert"><div class="alert alert-info " v-if="metricsJobId">
+        Submitted Metrics job {{metricsJobId.metrics_job_id}}. Check the
+        <router-link to="metrics-reports/">/metrics-reports/</router-link>
+        page for your results</div>
+      </transition>
+      <transition name="alert"><div class="alert alert-info submit-report-job-alert" v-if="selectedProjects.length > 0">
+        Submit metrics report run for selected projects
+        <button class="btn btn-outline-primary load-metrics" @click="submitMetricsReportReq">
+          <font-awesome-icon icon="chevron-right"></font-awesome-icon>
+        </button>
+      </div></transition>
     </div>
 
     <modal v-if="clearModelModal" :closable="true" @modal:close="clearModelModal = false">
@@ -172,7 +192,8 @@ export default {
           { key: 'create_time', label: 'Create Time', sortable: true },
           { key: 'cuis', label: 'Concepts' },
           { key: 'require_entity_validation', label: 'Annotate / Validate' },
-          { key: 'status', label: 'Status' },
+          { key: 'status', label: 'Status', sortable: true },
+          { key: 'progress', label: 'Progress', formatter: this.progressFormatter },
           { key: 'anno_class', label: 'Annotation Classification'},
           { key: 'cdb_search_filter', label: 'Concepts Imported' },
           { key: 'model_loaded', label: 'Model Loaded' },
@@ -195,6 +216,7 @@ export default {
       modelSavedError: false,
       loadingModel: false,
       modelCacheLoadError: false,
+      metricsJobId: null,
       saving: false,
       routeAlert: false,
       isAdmin: false,
@@ -243,9 +265,7 @@ export default {
           if (resp.data.next) {
             this.fetchPage(resp.data.next)
           } else {
-            this.fetchCDBsLoaded()
-            this.fetchSearchIndexStatus()
-            this.loadingProjects = false
+            this.postLoadedProjects()
           }
         }).catch(() => {
           this.$cookie.delete('username')
@@ -263,9 +283,15 @@ export default {
         if (resp.data.next) {
           this.fetchPage(resp.data.next)
         } else {
-          this.fetchCDBsLoaded()
+          this.postLoadedProjects()
         }
       })
+    },
+    postLoadedProjects () {
+      this.fetchCDBsLoaded()
+      this.fetchSearchIndexStatus()
+      this.fetchProjectProgress()
+      this.loadingProjects = false
     },
     fetchCDBsLoaded () {
       this.$http.get('/api/model-loaded/').then(resp => {
@@ -302,12 +328,16 @@ export default {
         this.selectedProjects.push(project)
       }
     },
-    loadMetrics () {
-      this.$router.push({
-        name: 'metrics',
-        query: {
-          projectIds: this.selectedProjects.map(p => p.id).join(',')
-        }
+    submitMetricsReportReq () {
+      const payload = {
+        projectIds: this.selectedProjects.map(p => p.id).join(',')
+      }
+      this.selectedProjects = []
+      this.$http.post('/api/metrics-job/', payload).then(resp => {
+        this.metricsJobId = resp.data
+        setTimeout(() => {
+          this.metricsJobId = null
+        }, 15000)
       })
     },
     fetchSearchIndexStatus () {
@@ -316,6 +346,16 @@ export default {
         this.cdbSearchIndexStatus = resp.data.results
       }).catch(err => {
         console.log(err)
+      })
+    },
+    fetchProjectProgress () {
+      const projectIds = this.projects.items.map(p => p.id)
+      this.$http.get(`/api/project-progress/?projects=${projectIds}`).then(resp => {
+        this.projects.items = this.projects.items.map(item => {
+          item['progress'] = `${resp.data[item.id].validated_count} / ${resp.data[item.id].dataset_count}`
+          item['percent_progress'] = Math.ceil((resp.data[item.id].validated_count / resp.data[item.id].dataset_count) * 100)
+          return item
+        })
       })
     },
     select (projects) {
@@ -355,12 +395,25 @@ export default {
           that.modelSavedError = false
         }, 5000)
       })
+    },
+    progressFormatter (value, key, item) {
+      let txtColorClass = 'good-perf'
+      if (item['percent_progress'] < 80) {
+        txtColorClass = 'bad-perf'
+      }
+      return `
+        <div class="progress-container ${txtColorClass}">
+            ${value}
+            <div class="progress-gradient-fill" style="width: calc(${item['percent_progress']}%);"></div>
+        </div>
+
+      `
     }
   }
 }
 </script>
 
-<style scoped lang="scss">
+<style lang="scss">
 h3 {
   margin: 10%
 }
@@ -442,6 +495,34 @@ h3 {
 
 .load-metrics {
   padding: 0 5px;
+
+}
+
+.progress-container {
+  position: relative;
+  padding-left: 2px;
+}
+
+.progress-gradient-fill {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  height: 25px;
+  padding: 0 1px;
+  background-image: linear-gradient(to right, #32ab60, #E8EDEE);
+  box-shadow: 0 5px 5px -5px #32ab60;
+}
+
+.good-perf {
+  color: #E5EBEA;
+}
+
+.bad-perf {
+  color: #45503B;
+}
+
+.submit-report-job-alert {
+  text-align: right;
 }
 
 </style>

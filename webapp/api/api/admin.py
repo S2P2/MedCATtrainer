@@ -35,9 +35,6 @@ def reset_project(modeladmin, request, queryset):
         # Remove all annotations and cascade to meta anns
         AnnotatedEntity.objects.filter(project=project).delete()
 
-        # Remove cui_counts
-        ProjectCuiCounter.objects.filter(project=project).delete()
-
         # Set all validated documents to none
         project.validated_documents.clear()
 
@@ -231,6 +228,8 @@ def retrieve_project_data(projects: QuerySet) -> Dict[str, List]:
         out['name'] = project.name
         out['id'] = project.id
         out['cuis'] = project.cuis
+        out['project_status'] = project.project_status
+        out['project_locked'] = project.project_locked
         out['documents'] = []
 
         if project.cuis_file is not None and project.cuis_file:
@@ -375,6 +374,8 @@ admin.site.register(Dataset, DatasetAdmin)
 class ProjectAnnotateEntitiesAdmin(admin.ModelAdmin):
     model = ProjectAnnotateEntities
     actions = [download, download_without_text, download_without_text_with_doc_names, reset_project, clone_projects]
+    list_filter = ('members', 'project_status', 'project_locked', 'annotation_classification')
+    list_display = ['name']
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'concept_db':
@@ -452,13 +453,6 @@ class ConceptDBAdmin(admin.ModelAdmin):
 admin.site.register(ConceptDB, ConceptDBAdmin)
 
 
-class ProjectCuiCounterAdmin(admin.ModelAdmin):
-    model = ProjectCuiCounter
-    list_filter = ('project',)
-    list_display = ['entity', 'count', 'project']
-admin.site.register(ProjectCuiCounter, ProjectCuiCounterAdmin)
-
-
 def remove_all_documents(modeladmin, request, queryset):
     Document.objects.all().delete()
 
@@ -478,3 +472,12 @@ class ExportedProjectAdmin(admin.ModelAdmin):
 
 
 admin.site.register(ExportedProject, ExportedProjectAdmin)
+
+
+class ProjectMetricsAdmin(admin.ModelAdmin):
+    model = ProjectMetrics
+    list_display = ('report_name', 'report_name_generated')
+    list_filter = ['projects']
+
+
+admin.site.register(ProjectMetrics, ProjectMetricsAdmin)

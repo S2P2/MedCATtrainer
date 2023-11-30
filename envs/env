@@ -1,3 +1,6 @@
+### Required for later numpy versions
+OPENBLAS_NUM_THREADS=1
+
 ### MedCAT cfg ###
 MEDCAT_CONFIG_FILE=/home/configs/base.txt
 
@@ -17,3 +20,16 @@ MAX_DATASET_SIZE=10000
 ### Solr Concept Search Conf ###
 CONCEPT_SEARCH_SERVICE_HOST=solr
 CONCEPT_SEARCH_SERVICE_PORT=8983
+
+### DB backup dir ###
+# volume mount location, default docker host system volume location, this might be different in /etc/docker/daemon.json
+DB_DIR=/home/api/db
+# currently only supports sqlite3 dbs
+DB_PATH=${DB_DIR}/db.sqlite3
+DB_BACKUP_DIR=/home/api/db-backup
+
+# Resubmit all on startup
+RESUBMIT_ALL_ON_STARTUP=1
+
+# Front end env vars
+LOAD_NUM_DOC_PAGES=10
