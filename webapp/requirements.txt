@@ -7,3 +7,4 @@ djangorestframework~=3.10
 django-background-tasks~=1.2
 openpyxl~=3.0
 medcat~=1.10
+spacy-pythainlp~=0.1
