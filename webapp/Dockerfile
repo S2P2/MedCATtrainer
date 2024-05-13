@@ -32,7 +32,7 @@ RUN npm install && npm run build
 WORKDIR /home/
 RUN pip install pip --upgrade 
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install git+https://github.com/S2P2/MedCAT.git@test/no-ref/thai-language-support
+RUN pip install git+https://github.com/S2P2/MedCAT.git@test/no-ref/thai-language-support --extra-index-url https://download.pytorch.org/whl/cpu/
 ARG SPACY_MODELS="en_core_web_md"
 RUN for SPACY_MODEL in ${SPACY_MODELS}; do python -m spacy download ${SPACY_MODEL}; done
 
