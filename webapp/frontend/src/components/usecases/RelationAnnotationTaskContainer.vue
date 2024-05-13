@@ -118,10 +118,15 @@ export default {
 </script>
 
 <style scoped lang="scss">
+.relation-extraction-container {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
 .add-rel-btn {
   position: absolute;
   right: 10px;
-  top: 72px;
+  top: 42px;
   float: right;
   cursor: pointer;
   opacity: 0.5;

@@ -54,10 +54,6 @@ def _process_result_repsonse(resp: Dict):
                 'type_ids': d.get('type_ids', []),
                 'synonyms': d['synonyms']
             }
-            if d.get('icd10'):
-                parsed_doc['icd10'] = d['icd10'][0]
-            if d.get('opcs4'):
-                parsed_doc['opcs4'] = d['opcs4'][0]
             uniq_results_map[d['cui'][0]] = parsed_doc
     return uniq_results_map
 
@@ -191,33 +187,15 @@ def _upload_payload(update_url, data, collection, commit=False):
 
 
 def _concept_dct(cui: str, cdb: CDB):
+    synonyms = list(cdb.addl_info.get('cui2original_names', {}).get(cui, set()))
     concept_dct = {
         'cui': str(cui),
         'pretty_name': cdb.get_name(cui),
         'name': re.sub(r'\([\w+\s]+\)', '', cdb.get_name(cui)).strip(),
         'type_ids': list(cdb.cui2type_ids[cui]),
         'desc': cdb.addl_info.get('cui2description', {}).get(cui, ''),
-        'synonyms': list(cdb.addl_info.get('cui2original_names', {}).get(cui, set())),
+        'synonyms': synonyms if len(synonyms) > 0 else [cdb.get_name(cui)]
     }
-    icd_codes = cdb.addl_info.get('cui2icd10', {}).get(cui, None)
-    if icd_codes is not None:
-        try:
-            concept_dct['icd10'] = ', '.join([f'{code["code"]} : {code["name"]}'
-                                              for code in icd_codes])
-        except Exception:
-            logger.warning(f'Tried to extract ICD codes for cui:{cui} for concept (solr) search - '
-                           f'but encountered icd_codes of the form:{icd_codes}, expected a list of '
-                           '{code: <the code>, name: <human readable desc>, ...}')
-    opcs_codes = cdb.addl_info.get('cui2opcs4', {}).get(cui, None)
-    if opcs_codes is not None:
-        try:
-            concept_dct['opcs4'] = ', '.join([f'{code["code"]} : {code["name"]}'
-                                              for code in opcs_codes])
-        except Exception:
-            logger.warning(f'Tried to upload OPCS codes for cui:{cui} for concept (solr) search - '
-                           f'but encountered OPCS codes of the form:{opcs_codes}, expected a list of '
-                           '{code: <the code>, name: <human readable desc> ...}')
-
     return concept_dct
 
 

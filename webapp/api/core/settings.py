@@ -26,7 +26,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 realm = os.environ.get('ENV', 'non-prod')
 secret_key = os.environ.get('SECRET_KEY')
 if realm == 'prod' and secret_key is None:
-    msg = 'No SECRET_KEY envrionment variable found for prod envrionment. Please add a secret key and re-run'
+    msg = 'No SECRET_KEY environment variable found for prod environment. Please add a secret key and re-run'
     log.error(msg)
     sys.exit(msg)
 else:
@@ -75,6 +75,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
             os.path.join(BASE_DIR, "..", "frontend", "dist"),
+            os.path.join(BASE_DIR, "..", "templates", "registration")
             ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -192,3 +193,13 @@ SOLR_HOST = os.environ.get('CONCEPT_SEARCH_SERVICE_HOST', 'solr')
 SOLR_PORT = os.environ.get('CONCEPT_SEARCH_SERVICE_PORT', '8983')
 
 SILENCED_SYSTEM_CHECKS = ['admin.E130']
+
+# For testing only
+# EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.environ.get('EMAIL_HOST')
+EMAIL_PORT = os.environ.get('EMAIL_PORT')
+EMAIL_HOST_USER = os.environ.get('EMAIL_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASS')
+EMAIL_USE_TLS = True

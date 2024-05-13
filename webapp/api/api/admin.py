@@ -94,10 +94,6 @@ def download_projects_without_text(projects, with_doc_name):
                 out_ann['last_modified'] = str(ann.last_modified)
                 out_ann['manually_created'] = ann.manually_created
                 out_ann['acc'] = ann.acc
-                if ann.icd_code:
-                    out_ann['icd_code'] = ann.icd_code.code
-                if ann.opcs_code:
-                    out_ann['opcs_code'] = ann.opcs_code.code
                 out_ann['meta_anns'] = {}
 
                 # Get MetaAnnotations
@@ -162,6 +158,23 @@ def retrieve_project_data(projects: QuerySet) -> Dict[str, List]:
             "name": "<project_name"  # name of the project
             "id": "<id>"  # the auto-generated id of the project (optional)
             "cuis": ["cui_1", "cui_2" ... ]  # the CUI filter for the project, includes those from file / and text-box
+            "meta_anno_defs": [
+                # list of meta annotation tasks configured for this project.
+                {
+                    "name": "Name of meta annotation task",
+                    "values": [
+                        "<first value>",
+                        "<second value>"
+                        ...
+                    ],
+                },
+                ... more meta_annotation tasks configured for this project
+            ],
+            "relation_anno_defs": [
+                "<name1>",
+                "<name2>"
+                ... more relation annotation task names configured for this project
+            ]
             "documents": [
                 {
                 "id": "<id>"  # the auto-generated id of the document (optional)
@@ -230,6 +243,9 @@ def retrieve_project_data(projects: QuerySet) -> Dict[str, List]:
         out['cuis'] = project.cuis
         out['project_status'] = project.project_status
         out['project_locked'] = project.project_locked
+        out['meta_anno_defs'] = [{'name': t.name, 'values': [v.name for v in t.values.all()]}
+                                 for t in project.tasks.all()]
+        out['relation_anno_defs'] = [r.label for r in project.relations.all()]
         out['documents'] = []
 
         if project.cuis_file is not None and project.cuis_file:
@@ -267,18 +283,6 @@ def retrieve_project_data(projects: QuerySet) -> Dict[str, List]:
                 out_ann['comment'] = ann.comment
                 out_ann['manually_created'] = ann.manually_created
                 out_ann['acc'] = ann.acc
-                # if ann.icd_code:
-                #     out_ann['icd_code'] = {'code': ann.icd_code.code, 'desc': ann.icd_code.desc}
-                # if ann.opcs_code:
-                #     out_ann['opcs_codes'] = {'code': ann.opcs_code, 'desc': ann.opcs_code.desc}
-                #
-                # out_ann['acc'] = ann.acc
-                # if ann.comment:
-                #     out_ann['comment'] = ann.comment
-                # if ann.icd_code:
-                #     out_ann['icd_code'] = ann.icd_code.code
-                # if ann.opcs_code:
-                #     out_ann['opcs_code'] = ann.opcs_code.code
                 out_ann['meta_anns'] = {}
 
                 # Get MetaAnnotations
@@ -438,12 +442,6 @@ def import_concepts(modeladmin, request, queryset):
 def delete_indexed_concepts(modeladmin, request, queryset):
     for concept_db in queryset:
         drop_collection(concept_db)
-        ICDCode.objects.filter(cdb=concept_db).delete()
-        OPCSCode.objects.filter(cdb=concept_db).delete()
-
-
-admin.site.register(ICDCode)
-admin.site.register(OPCSCode)
 
 
 class ConceptDBAdmin(admin.ModelAdmin):

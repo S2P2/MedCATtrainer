@@ -20,24 +20,6 @@ BOOL_CHOICES = [
         ]
 
 
-class ICDCode(models.Model):
-    code = models.CharField(max_length=10, unique=True)
-    desc = models.CharField(max_length=300)
-    cdb = models.ForeignKey('ConceptDB', on_delete=models.SET_NULL, blank=True, null=True)
-
-    def __str__(self):
-        return f'{self.code} | {self.desc}'
-
-
-class OPCSCode(models.Model):
-    code = models.CharField(max_length=10, unique=True)
-    desc = models.CharField(max_length=300)
-    cdb = models.ForeignKey('ConceptDB', on_delete=models.SET_NULL, blank=True, null=True)
-
-    def __str__(self):
-        return f'{self.code} | {self.desc}'
-
-
 cdb_name_validator = RegexValidator(r'^[0-9a-zA-Z_-]*$', 'Only alpahanumeric characters, -, _ are allowed for CDB names')
 
 
@@ -123,6 +105,7 @@ class Project(PolymorphicModel):
                                                            "outlininng a guide for annotators to follow for this project,"
                                                            "an example is available here: https://docs.google.com/document/d/1xxelBOYbyVzJ7vLlztP2q1Kw9F5Vr1pRwblgrXPS7QM/edit?usp=sharing")
     create_time = models.DateTimeField(auto_now_add=True)
+    last_modified = models.DateTimeField(auto_now=True)
     members = models.ManyToManyField(settings.AUTH_USER_MODEL)
     dataset = models.ForeignKey('Dataset', on_delete=models.CASCADE)
     validated_documents = models.ManyToManyField(Document, default=None, blank=True)
@@ -173,6 +156,11 @@ class EntityRelation(models.Model):
     class Meta:
         ordering = ['id']
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.project.last_modified = self.last_modified
+        self.project.save()
+
     def __str__(self):
         return f'{self.start_entity} - {self.relation} - {self.end_entity}'
 
@@ -197,13 +185,13 @@ class AnnotatedEntity(models.Model):
     create_time = models.DateTimeField(auto_now_add=True)
     last_modified = models.DateTimeField(auto_now=True)
 
-    # Specific to the Clinical Coding use case - feels hacky being directly on this model.
-    # Should AnnotatedEntity be a polymorphic model?? and there be a specific ClinicalCodingAnnotatedEntity??
-    icd_code = models.ForeignKey('ICDCode', on_delete=models.SET_NULL, blank=True, null=True)
-    opcs_code = models.ForeignKey('OPCSCode', on_delete=models.SET_NULL, blank=True, null=True)
-
     class Meta:
         ordering = ['id']
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.project.last_modified = self.last_modified
+        self.project.save()
 
     def __str__(self):
         return str(self.entity)
@@ -266,6 +254,12 @@ class MetaAnnotation(models.Model):
     meta_task_value = models.ForeignKey('MetaTaskValue', on_delete=models.CASCADE)
     acc = models.FloatField(default=1)
     validated = models.BooleanField(default=False)
+    last_modified = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.annotated_entity.last_modified = self.last_modified
+        self.annotated_entity.save()
 
     def __str__(self):
         return str(self.annotated_entity)
